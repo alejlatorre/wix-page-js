@@ -2,9 +2,26 @@
 import wixData from 'wix-data';
 import wixLocation from 'wix-location';
 
+let currentPage = 0
+const itemsPerPage = 18
+let hasMoreItems = true
+
 $w.onReady(function () {
     initializeDropdowns()
     configureWhatsappIntegration()
+
+    $w('#prevPageTop').onClick(() => loadPrevPage())
+    $w('#prevPageBottom').onClick(() => {
+        loadPrevPage()
+        focusOnFilters()
+    })
+    $w('#nextPageTop').onClick(() => loadNextPage())
+    $w('#nextPageBottom').onClick(() => {
+        loadNextPage()
+        focusOnFilters()
+    })
+
+    applyFilters($w('#dropdownSizes'), $w('#dropdownBrand'), $w('#dropdownPrice'), $w('#productDataset'))
 })
 
 function initializeDropdowns() {
@@ -14,6 +31,7 @@ function initializeDropdowns() {
     const dropdownBrand = $w('#dropdownBrand')
     const dropdownPrice = $w('#dropdownPrice')
     const productDataset = $w('#productDataset')
+
 
     getUniqueSizes(productCollectionName)
         .then((uniqueSizes) => configureSizeDropdown(dropdownSizes, uniqueSizes))
@@ -107,7 +125,14 @@ function applyFilters(dropdownSizes, dropdownBrands, dropdownPriceRanges, produc
     let filter = wixData.filter()
 
     if (selectedSize) {
-        filter = filter.contains("tallas", selectedSize)
+        // FIXME: This should be refactored to use just eq by transforming "tallas" into an array 
+        filter = filter.and(
+            wixData.filter()
+                .contains("tallas", ` ${selectedSize} `) // Add spaces to ensure exact match
+                .or(wixData.filter().startsWith("tallas", `${selectedSize} `)) // Match at the start
+                .or(wixData.filter().endsWith("tallas", ` ${selectedSize}`)) // Match at the end
+                .or(wixData.filter().eq("tallas", selectedSize)) // Exact match
+        )
     }
     if (selectedBrand) {
         filter = filter.contains("nombre", selectedBrand)
@@ -116,17 +141,60 @@ function applyFilters(dropdownSizes, dropdownBrands, dropdownPriceRanges, produc
         filter = addPriceFilter(selectedPriceRange, filter)
     }
 
+    currentPage = 0
     productDataset.setFilter(filter)
-        .then(() => productDataset.getItems(0, 1000))
-        .catch((error) => console.error("Error applying filters:", error))
+        .then(() => loadCurrentPage())
+        .catch((error) => console.error("Error applying filters:", error))        
 }
+
+function loadCurrentPage() {
+    const productDataset = $w('#productDataset')
+    productDataset.getItems(currentPage * itemsPerPage, itemsPerPage)
+        .then((result) => {
+            $w('#repeater1').data = result.items
+            hasMoreItems = result.items.length === itemsPerPage
+            updatePaginationCotrols()
+        })
+        .catch((error) => console.error("Error loading current page:", error))
+}
+
+function loadNextPage() {
+    if (hasMoreItems) {
+        currentPage++
+        loadCurrentPage()
+    }
+}
+
+function loadPrevPage() {
+    if (currentPage > 0) {
+        currentPage--
+        loadCurrentPage()
+    }
+}
+
+function updatePaginationCotrols() {  
+    $w('#prevPageTop').enable()
+    $w('#prevPageBottom').enable()
+    $w('#nextPageTop').enable()
+    $w('#nextPageBottom').enable()
+
+    if (currentPage === 0) {
+        $w('#prevPageTop').disable()
+        $w('#prevPageBottom').disable()
+    }
+    if (!hasMoreItems) {
+        $w('#nextPageTop').disable()
+        $w('#nextPageBottom').disable()
+    }
+}
+
 
 function generatePriceRanges(price) {
     const ranges = [
         { upperLimit: 200, range: "Hasta S/ 200", order: 1},
         { upperLimit: 300, range: "S/ 200 - S/ 300", order: 2},
         { upperLimit: 400, range: "S/ 300 - S/ 400", order: 3},
-        { upperLimit: Infinity, range: "De S/ 400 a mas", order: 4},
+        { upperLimit: Infinity, range: "De S/ 400 a más", order: 4},
     ]
     const priceObject = ranges.find(range => price <= range.upperLimit)
     return { price: price, range: priceObject.range, order: priceObject.order }
@@ -145,6 +213,10 @@ function addPriceFilter(priceRange, currentFilter) {
         default:
             return currentFilter;
     }
+}
+
+function focusOnFilters() {
+    $w('#section3').scrollTo()
 }
 
 function configureWhatsappIntegration() {
