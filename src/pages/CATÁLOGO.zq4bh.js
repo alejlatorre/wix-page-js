@@ -5,10 +5,13 @@ import wixLocation from 'wix-location';
 let currentPage = 0
 const itemsPerPage = 18
 let hasMoreItems = true
+const staticImageServerUrl = "https://assets.avax.pe/static/"
+
 
 $w.onReady(function () {
     initializeDropdowns()
     configureWhatsappIntegration()
+    setProductsImages()
 
     $w('#prevPageTop').onClick(() => loadPrevPage())
     $w('#prevPageBottom').onClick(() => {
@@ -23,6 +26,16 @@ $w.onReady(function () {
 
     applyFilters($w('#dropdownSizes'), $w('#dropdownBrand'), $w('#dropdownPrice'), $w('#productDataset'))
 })
+
+function setProductsImages() {
+    $w('#repeater1').onItemReady(($item, itemData) => {
+        const code = itemData.codigo;
+        const fmtCode = code.replace(/ /g, "%20");
+        const imageUrl = `${staticImageServerUrl}${fmtCode}_img_principal.JPEG`;
+        let imageElement = $item("#image2")
+        imageElement.src = imageUrl
+    })
+}
 
 function initializeDropdowns() {
     const productCollectionName = 'productos'
